@@ -5,7 +5,8 @@
 #include <fcntl.h>
 #include <time.h>
 
-#define PIPE_PATH "/tmp/pipes"
+#define PIPE_PATH "pipes"
+#define BILLION 1000000000L  // 1 billion nanoseconds in a second
 
 // Function declarations
 void shared_memory();
@@ -59,9 +60,10 @@ void pipes() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Recieve time was: %llu \n", receive_time.tv_nsec);
+    printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
+    // printf("Recieve time was: %llu \n", receive_time.tv_nsec);
 
-    printf("Receiver received message: %s\n", buffer);
+    // printf("Receiver received message: %s\n", buffer);
 
     // Close the FIFO
     close(fd);

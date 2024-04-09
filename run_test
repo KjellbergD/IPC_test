@@ -1,7 +1,30 @@
 #!/bin/bash
 
-# Open terminal and run receiver executable
-./builddir/reciever "pipes" &
+# Define temporary file paths for sender and receiver outputs
+sender_output="sender_output.txt"
+receiver_output="receiver_output.txt"
 
-# Open another terminal and run sender executable
-./builddir/sender "pipes" &
+# Run receiver executable in background and capture output to file
+./builddir/receiver "pipes" > "$receiver_output" &
+receiver_pid=$!
+
+# Run sender executable in background and capture output to file
+./builddir/sender "pipes" > "$sender_output" &
+sender_pid=$!
+
+# Wait for both processes to finish
+wait "$sender_pid"
+wait "$receiver_pid"
+
+# Read send_time and receive_time from output files (in nanoseconds)
+send_time=$(<"$sender_output")
+receive_time=$(<"$receiver_output")
+
+# Calculate time difference (diff) in milliseconds with higher precision
+# Convert nanoseconds to milliseconds using floating-point arithmetic
+diff=$(echo "scale=3; ($receive_time - $send_time) / 1000000" | bc)
+
+echo "Time difference (diff): $diff milliseconds"
+
+# Clean up temporary files
+rm "$sender_output" "$receiver_output"
