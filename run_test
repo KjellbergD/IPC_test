@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Open terminal and run receiver executable
+./builddir/reciever "pipes" &
+
+# Open another terminal and run sender executable
+./builddir/sender "pipes" &

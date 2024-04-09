@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 
 #define PIPE_PATH "/tmp/pipes"
 
@@ -41,12 +42,21 @@ void shared_memory() {
 void pipes() {
     char message[] = "Hello from sender!";
     int fd;
+    struct timespec send_time;
 
     // Create or open the FIFO (named pipe) for writing
     if ((fd = open(PIPE_PATH, O_WRONLY)) < 0) {
         perror("open");
         exit(EXIT_FAILURE);
     }
+
+    // Get the start time
+    if (clock_gettime(CLOCK_MONOTONIC, &send_time) < 0) {
+        perror("clock_gettime");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Send time was: %llu \n", send_time.tv_nsec);
 
     // Write message to the FIFO
     write(fd, message, strlen(message) + 1);

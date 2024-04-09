@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 
 #define PIPE_PATH "/tmp/pipes"
 
@@ -41,6 +42,7 @@ void shared_memory() {
 void pipes() {
     char buffer[100];
     int fd;
+    struct timespec receive_time;
 
     // Create or open the FIFO (named pipe) for reading
     if ((fd = open(PIPE_PATH, O_RDONLY)) < 0) {
@@ -50,6 +52,15 @@ void pipes() {
 
     // Read message from the FIFO
     read(fd, buffer, sizeof(buffer));
+
+    // Get the end time
+    if (clock_gettime(CLOCK_MONOTONIC, &receive_time) < 0) {
+        perror("clock_gettime");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Recieve time was: %llu \n", receive_time.tv_nsec);
+
     printf("Receiver received message: %s\n", buffer);
 
     // Close the FIFO
