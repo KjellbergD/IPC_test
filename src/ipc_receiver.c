@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#define PIPE_PATH "pipes"
+#define PIPE_PATH "pipe"
 #define BILLION 1000000000L  // 1 billion nanoseconds in a second
 
 // Function declarations

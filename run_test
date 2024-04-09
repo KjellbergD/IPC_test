@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Define temporary file paths for sender and receiver outputs
+# Define temporary file paths for sender and receiver outputs and pipe
 sender_output="sender_output.txt"
 receiver_output="receiver_output.txt"
+pipe="pipe"
+
+# Define temporary pipe for IPC
+mkfifo $pipe
 
 # Run receiver executable in background and capture output to file
 ./builddir/receiver "pipes" > "$receiver_output" &
@@ -26,5 +30,5 @@ diff=$(echo "scale=3; ($receive_time - $send_time) / 1000000" | bc)
 
 echo "Time difference (diff): $diff milliseconds"
 
-# Clean up temporary files
-rm "$sender_output" "$receiver_output"
+# Clean up temporary files and pipe
+rm "$sender_output" "$receiver_output" "$pipe"
