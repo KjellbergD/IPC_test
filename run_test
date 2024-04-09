@@ -4,17 +4,25 @@
 sender_output="sender_output.txt"
 receiver_output="receiver_output.txt"
 pipe="pipe"
+test_type="queue"
 
 # Define temporary pipe for IPC
-mkfifo $pipe
-
-# Run receiver executable in background and capture output to file
-./builddir/receiver "pipes" > "$receiver_output" &
-receiver_pid=$!
+if [ "$test_type" == "pipes" ]; then
+    mkfifo $pipe
+fi
 
 # Run sender executable in background and capture output to file
-./builddir/sender "pipes" > "$sender_output" &
+./builddir/sender $test_type > "$sender_output" &
 sender_pid=$!
+
+# Sleep if we are dealing with shared memory
+if [ "$test_type" == "shared" ]; then
+    sleep 0.2
+fi
+
+# Run receiver executable in background and capture output to file
+./builddir/receiver $test_type > "$receiver_output" &
+receiver_pid=$!
 
 # Wait for both processes to finish
 wait "$sender_pid"
@@ -26,9 +34,18 @@ receive_time=$(<"$receiver_output")
 
 # Calculate time difference (diff) in milliseconds with higher precision
 # Convert nanoseconds to milliseconds using floating-point arithmetic
-diff=$(echo "scale=3; ($receive_time - $send_time) / 1000000" | bc)
+if [ "$test_type" == "shared" ]; then
+    # if shared, add the times
+    result=$(echo "scale=3; ($receive_time + $send_time) / 1000000" | bc)
+else
+    result=$(echo "scale=3; ($receive_time - $send_time) / 1000000" | bc)
+fi
 
-echo "Time difference (diff): $diff milliseconds"
+echo "Time: $result milliseconds"
 
 # Clean up temporary files and pipe
-rm "$sender_output" "$receiver_output" "$pipe"
+rm "$sender_output" "$receiver_output" 
+
+if [ "$test_type" == "pipes" ]; then
+    rm "$pipe"
+fi
