@@ -15,7 +15,7 @@
 #define PIPE_CHUNK_SIZE (1024 * 64)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 78
+#define MSGQ_KEY 79
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 
 // Function declarations
@@ -108,7 +108,6 @@ void shared_memory()
 void pipes()
 {
     int fd;
-    struct timespec receive_time;
 
     // Create or open the FIFO (named pipe) for reading
     if ((fd = open(PIPE_PATH, O_RDONLY)) < 0)
@@ -135,6 +134,7 @@ void pipes()
     }
 
     // Get the end time
+    struct timespec receive_time;
     if (clock_gettime(CLOCK_MONOTONIC, &receive_time) < 0)
     {
         perror("clock_gettime");
@@ -223,6 +223,10 @@ void msg_queue()
 
     printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
+    if (msgctl (msqid, IPC_RMID, NULL) == -1) {
+        perror("msgctl");
+        exit(EXIT_FAILURE);
+    }
     save_image(image_data);
     free(image_data);
 }

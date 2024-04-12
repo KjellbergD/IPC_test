@@ -13,7 +13,7 @@
 #define PIPE_CHUNK_SIZE (1024 * 64)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 78
+#define MSGQ_KEY 79
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 #define TEST_IMG "img/JEPPE.PNG"
 
@@ -117,17 +117,8 @@ void shared_memory(unsigned char *image_data, int image_size)
 // Experiment for Pipe communication
 void pipes(unsigned char *image_data, int image_size)
 {
-    int fd;
-    struct timespec send_time;
-
-    // Create or open the FIFO (named pipe) for writing
-    if ((fd = open(PIPE_PATH, O_WRONLY)) < 0)
-    {
-        perror("open");
-        exit(EXIT_FAILURE);
-    }
-
     // Get the start time
+    struct timespec send_time;
     if (clock_gettime(CLOCK_MONOTONIC, &send_time) < 0)
     {
         perror("clock_gettime");
@@ -135,6 +126,16 @@ void pipes(unsigned char *image_data, int image_size)
     }
 
     printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
+    
+    int fd;
+
+    // Create or open the FIFO (named pipe) for writing
+    if ((fd = open(PIPE_PATH, O_WRONLY)) < 0)
+    {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+    
     // printf("Send time was: %llu \n", send_time.tv_nsec);
 
     // Write message to the FIFO
@@ -176,13 +177,6 @@ void msg_queue(unsigned char *image_data, int image_size)
 {
     struct timespec send_time;
 
-    // Create or access the message queue
-    int msqid;
-    if ((msqid = msgget(MSGQ_KEY, IPC_CREAT | 0666)) < 0) {
-        perror("msgget");
-        exit(EXIT_FAILURE);
-    }
-
     // Get the start time
     if (clock_gettime(CLOCK_MONOTONIC, &send_time) < 0)
     {
@@ -191,6 +185,13 @@ void msg_queue(unsigned char *image_data, int image_size)
     }
 
     printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
+
+    // Create or access the message queue
+    int msqid;
+    if ((msqid = msgget(MSGQ_KEY, IPC_CREAT | 0666)) < 0) {
+        perror("msgget");
+        exit(EXIT_FAILURE);
+    }
     
     DataSize data_size;
     data_size.mtype = 1;

@@ -21,7 +21,7 @@ run_experiment() {
 
     # Sleep if we are dealing with shared memory
     if [ "$test_type" == "shared" ]; then
-        sleep 0.5
+    sleep 0.5
     fi
 
     # Run receiver executable in background and capture output to file
@@ -54,7 +54,7 @@ run_experiment() {
 }
 
 # Array of image counts to test
-image_counts=(1 5 10 20 40 80)
+image_counts=(1 5 10 20 40 80 160)
 types=("pipes" "shared" "queue")
 reps=1
 for type in "${types[@]}"; do
@@ -69,6 +69,7 @@ for type in "${types[@]}"; do
         done
         # Calculate the average time
         average_time=$(echo "scale=3; $total_time / $reps" | bc)
-        echo "Average Time using $type for $num_images images: $average_time milliseconds"
+        throughput=$(echo "scale=4; ($num_images / $average_time) * 1000" | bc)
+        echo "IPC_type: $type, size: $num_images MB, E2E_latency: $average_time ms, throughput: $throughput MB/sec"
     done
 done
