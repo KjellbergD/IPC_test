@@ -15,7 +15,7 @@
 #define PIPE_CHUNK_SIZE (1024 * 64)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 73
+#define MSGQ_KEY 78
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 
 // Function declarations
@@ -120,7 +120,7 @@ void pipes()
     // Read message from the FIFO
     int image_size;
     read(fd, &image_size, sizeof(int));
-    unsigned char buffer[image_size];
+    unsigned char *buffer = malloc(image_size);
 
     size_t total_read = 0;
 
@@ -144,6 +144,7 @@ void pipes()
     printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
     save_image(buffer);
+    free(buffer);
     // printf("Recieve time was: %llu \n", receive_time.tv_nsec);
 
     // printf("Receiver received message: %s\n", buffer);
@@ -223,6 +224,7 @@ void msg_queue()
     printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
     save_image(image_data);
+    free(image_data);
 }
 
 void save_image(unsigned char *image_data)

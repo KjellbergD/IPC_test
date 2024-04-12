@@ -13,10 +13,11 @@
 #define PIPE_CHUNK_SIZE (1024 * 64)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 73
+#define MSGQ_KEY 78
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
-#define TEST_IMG "img/25KB.png"
+#define TEST_IMG "img/JEPPE.PNG"
 
+#define ONE_MB (1024 * 1024)
 
 // Function declarations
 void shared_memory(unsigned char *image_data, int image_size);
@@ -25,26 +26,35 @@ void msg_queue(unsigned char *image_data, int image_size);
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    if (argc != 3)
     {
-        printf("Usage: %s <function_name>\n", argv[0]);
+        printf("Usage: %s <function_name> <num_images>\n", argv[0]);
         return -1;
     }
+
+    int num_images = atoi(argv[2]);
 
     // Load test image
     int image_width, image_height, image_channels;
     unsigned char *raw_image_data = stbi_load(TEST_IMG, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
-
-    // Insert image metadata
-    int raw_image_size = image_width * image_height * image_channels;
-    int image_data_size = raw_image_size + 3 * sizeof(int);
-    unsigned char *image_data = (unsigned char *)malloc(image_data_size);
-    memcpy(image_data + sizeof(int) * 0, &image_width, sizeof(int));
-    memcpy(image_data + sizeof(int) * 1, &image_height, sizeof(int));
-    memcpy(image_data + sizeof(int) * 2, &image_channels, sizeof(int));
-    memcpy(image_data + sizeof(int) * 3, raw_image_data, raw_image_size);
+    unsigned char one_mb_image_data[ONE_MB] = {0};
+    memcpy(one_mb_image_data, raw_image_data, ONE_MB); // copy one MB of image data
     stbi_image_free(raw_image_data);
 
+    int fake_width = 1024;
+    int fake_height = 1024;
+    int fake_channels = 1;
+    int image_data_size = (ONE_MB + 3 * sizeof(int)) * num_images;
+    int offset = 0;
+    unsigned char *image_data = (unsigned char *)malloc(image_data_size);
+    for (size_t i = 0; i < num_images; i++)
+    {
+        memcpy(image_data + offset, &fake_width, sizeof(int)); offset += sizeof(int);
+        memcpy(image_data + offset, &fake_height, sizeof(int)); offset += sizeof(int);
+        memcpy(image_data + offset, &fake_channels, sizeof(int)); offset += sizeof(int);
+        memcpy(image_data + offset, one_mb_image_data, ONE_MB); offset += ONE_MB;
+    }
+    
     // Check the string argument and call respective functions
     if (strcmp(argv[1], "shared") == 0)
     {
@@ -63,6 +73,8 @@ int main(int argc, char *argv[])
         printf("Invalid function name: %s. Valid names are 'shared', 'pipes' and 'queue'\n", argv[1]);
         return -1;
     }
+
+    free(image_data);
 
     return 0;
 }
@@ -164,6 +176,13 @@ void msg_queue(unsigned char *image_data, int image_size)
 {
     struct timespec send_time;
 
+    // Create or access the message queue
+    int msqid;
+    if ((msqid = msgget(MSGQ_KEY, IPC_CREAT | 0666)) < 0) {
+        perror("msgget");
+        exit(EXIT_FAILURE);
+    }
+
     // Get the start time
     if (clock_gettime(CLOCK_MONOTONIC, &send_time) < 0)
     {
@@ -172,13 +191,6 @@ void msg_queue(unsigned char *image_data, int image_size)
     }
 
     printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
-    
-    // Create or access the message queue
-    int msqid;
-    if ((msqid = msgget(MSGQ_KEY, IPC_CREAT | 0666)) < 0) {
-        perror("msgget");
-        exit(EXIT_FAILURE);
-    }
     
     DataSize data_size;
     data_size.mtype = 1;

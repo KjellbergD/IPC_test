@@ -1,51 +1,74 @@
 #!/bin/bash
 
-# Define temporary file paths for sender and receiver outputs and pipe
-sender_output="sender_output.txt"
-receiver_output="receiver_output.txt"
-pipe="pipe"
-test_type="queue"
+# Function to run the experiment
+run_experiment() {
+    local num_images=$1
 
-# Define temporary pipe for IPC
-if [ "$test_type" == "pipes" ]; then
-    mkfifo $pipe
-fi
+    # Define temporary file paths for sender and receiver outputs and pipe
+    local sender_output="sender_output.txt"
+    local receiver_output="receiver_output.txt"
+    local pipe="pipe"
+    local test_type=$2
 
-# Run sender executable in background and capture output to file
-./builddir/sender $test_type > "$sender_output" &
-sender_pid=$!
+    # Define temporary pipe for IPC
+    if [ "$test_type" == "pipes" ]; then
+        mkfifo $pipe
+    fi
 
-# Sleep if we are dealing with shared memory
-if [ "$test_type" == "shared" ]; then
-    sleep 0.2
-fi
+    # Run sender executable in background and capture output to file
+    ./builddir/sender $test_type $num_images > "$sender_output" &
+    local sender_pid=$!
 
-# Run receiver executable in background and capture output to file
-./builddir/receiver $test_type > "$receiver_output" &
-receiver_pid=$!
+    # Sleep if we are dealing with shared memory
+    if [ "$test_type" == "shared" ]; then
+        sleep 0.5
+    fi
 
-# Wait for both processes to finish
-wait "$sender_pid"
-wait "$receiver_pid"
+    # Run receiver executable in background and capture output to file
+    ./builddir/receiver $test_type > "$receiver_output" &
+    local receiver_pid=$!
 
-# Read send_time and receive_time from output files (in nanoseconds)
-send_time=$(<"$sender_output")
-receive_time=$(<"$receiver_output")
+    # Wait for both processes to finish
+    wait "$sender_pid"
+    wait "$receiver_pid"
 
-# Calculate time difference (diff) in milliseconds with higher precision
-# Convert nanoseconds to milliseconds using floating-point arithmetic
-if [ "$test_type" == "shared" ]; then
-    # if shared, add the times
-    result=$(echo "scale=3; ($receive_time + $send_time) / 1000000" | bc)
-else
-    result=$(echo "scale=3; ($receive_time - $send_time) / 1000000" | bc)
-fi
+    # Read send_time and receive_time from output files (in nanoseconds)
+    local send_time=$(<"$sender_output")
+    local receive_time=$(<"$receiver_output")
 
-echo "Time: $result milliseconds"
+    # Calculate time difference (diff) in milliseconds with higher precision
+    # Convert nanoseconds to milliseconds using floating-point arithmetic
+    if [ "$test_type" == "shared" ]; then
+        # if shared, add the times
+        echo "scale=3; ($receive_time + $send_time) / 1000000" | bc
+    else
+        echo "scale=3; ($receive_time - $send_time) / 1000000" | bc
+    fi
 
-# Clean up temporary files and pipe
-rm "$sender_output" "$receiver_output" 
+    # Clean up temporary files and pipe
+    rm "$sender_output" "$receiver_output" 
 
-if [ "$test_type" == "pipes" ]; then
-    rm "$pipe"
-fi
+    if [ "$test_type" == "pipes" ]; then
+        rm "$pipe"
+    fi
+}
+
+# Array of image counts to test
+image_counts=(1 5 10 20 40 80)
+types=("pipes" "shared" "queue")
+reps=1
+for type in "${types[@]}"; do
+    echo "Running experiments for $type"
+    # Loop over each number of images
+    for num_images in "${image_counts[@]}"; do
+        total_time=0
+        # Run the experiment 50 times for the current number of images
+        for ((i=1; i<=$reps; i++)); do
+            result=$(run_experiment $num_images $type)
+            total_time=$(echo "$total_time + $result" | bc)
+        done
+        # Calculate the average time
+        average_time=$(echo "scale=3; $total_time / $reps" | bc)
+        echo "Average Time using $type for $num_images images: $average_time milliseconds"
+    done
+done
