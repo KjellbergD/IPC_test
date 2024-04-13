@@ -10,14 +10,15 @@
 #include "stb_image.h"
 
 #define PIPE_PATH "pipe"
-#define PIPE_CHUNK_SIZE (1024 * 64)
+#define PIPE_CHUNK_SIZE (1024 * 4)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 79
+#define MSGQ_KEY 80
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 #define TEST_IMG "img/JEPPE.PNG"
-
 #define ONE_MB (1024 * 1024)
+
+static int do_print = 0;
 
 // Function declarations
 void shared_memory(unsigned char *image_data, int image_size);
@@ -26,20 +27,26 @@ void msg_queue(unsigned char *image_data, int image_size);
 
 int main(int argc, char *argv[])
 {
-    if (argc != 3)
+    sleep(1);
+    if (argc != 4)
     {
-        printf("Usage: %s <function_name> <num_images>\n", argv[0]);
+        printf("Usage: %s <function_name> <do_print> <num_images>\n", argv[0]);
         return -1;
     }
 
-    int num_images = atoi(argv[2]);
+    do_print = atoi(argv[2]);
+    int num_images = atoi(argv[3]);
 
     // Load test image
-    int image_width, image_height, image_channels;
-    unsigned char *raw_image_data = stbi_load(TEST_IMG, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
-    unsigned char one_mb_image_data[ONE_MB] = {0};
-    memcpy(one_mb_image_data, raw_image_data, ONE_MB); // copy one MB of image data
-    stbi_image_free(raw_image_data);
+    //int image_width, image_height, image_channels;
+    //unsigned char *raw_image_data = stbi_load(TEST_IMG, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
+    unsigned char one_mb_image_data[ONE_MB];
+    unsigned char data_pattern = 0xAB;
+    for (int i = 0; i < ONE_MB; i++) {
+        one_mb_image_data[i] = data_pattern;
+    }
+    //memcpy(one_mb_image_data, raw_image_data, ONE_MB); // copy one MB of image data
+    //stbi_image_free(raw_image_data);
 
     int fake_width = 1024;
     int fake_height = 1024;
@@ -108,7 +115,7 @@ void shared_memory(unsigned char *image_data, int image_size)
     long elapsed_time_ns = (end_time.tv_sec - start_time.tv_sec) \
             * BILLION + (end_time.tv_nsec - start_time.tv_nsec);
 
-    printf("%ld", elapsed_time_ns);
+    if (do_print) printf("%ld", elapsed_time_ns);
 
     // Detach from shared memory
     shmdt(shmaddr);
@@ -125,7 +132,7 @@ void pipes(unsigned char *image_data, int image_size)
         exit(EXIT_FAILURE);
     }
 
-    printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
+    if (do_print) printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
     
     int fd;
 
@@ -184,7 +191,7 @@ void msg_queue(unsigned char *image_data, int image_size)
         exit(EXIT_FAILURE);
     }
 
-    printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
+    if (do_print) printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
 
     // Create or access the message queue
     int msqid;

@@ -12,11 +12,13 @@
 #include "stb_image_write.h"
 
 #define PIPE_PATH "pipe"
-#define PIPE_CHUNK_SIZE (1024 * 64)
+#define PIPE_CHUNK_SIZE (1024 * 4)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
-#define MSGQ_KEY 79
+#define MSGQ_KEY 80
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
+
+static int do_print = 0;
 
 // Function declarations
 void shared_memory();
@@ -26,11 +28,14 @@ void save_image(unsigned char *image_data);
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    sleep(1);
+    if (argc != 3)
     {
-        printf("Usage: %s <function_name>\n", argv[0]);
+        printf("Usage: %s <function_name> <do_print>\n", argv[0]);
         return -1;
     }
+
+    do_print = atoi(argv[2]);
 
     // Check the string argument and call respective functions
     if (strcmp(argv[1], "shared") == 0)
@@ -95,7 +100,7 @@ void shared_memory()
     long elapsed_time_ns = ((after_attach_time.tv_sec - before_attach_time.tv_sec) \
             * BILLION) + (after_attach_time.tv_nsec - before_attach_time.tv_nsec);
 
-    printf("%ld", elapsed_time_ns);
+    if (do_print) printf("%ld", elapsed_time_ns);
 
     save_image(shmaddr);
 
@@ -141,7 +146,7 @@ void pipes()
         exit(EXIT_FAILURE);
     }
 
-    printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
+    if (do_print) printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
     save_image(buffer);
     free(buffer);
@@ -221,7 +226,7 @@ void msg_queue()
         exit(EXIT_FAILURE);
     }
 
-    printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
+    if (do_print) printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
     if (msgctl (msqid, IPC_RMID, NULL) == -1) {
         perror("msgctl");
@@ -233,6 +238,7 @@ void msg_queue()
 
 void save_image(unsigned char *image_data)
 {
+    return;
     int image_width = *(int *)image_data;
     int image_height = *((int *)(image_data + sizeof(int)));
     int image_channels = *((int *)(image_data + sizeof(int) * 2));

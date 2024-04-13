@@ -1,22 +1,16 @@
 #!/bin/bash
+sender_output="sender_output.txt"
+receiver_output="receiver_output.txt"
+output_file="perf_data.perf"  # Output file name
+pipe="pipe"
 
-# Function to run the experiment
-run_experiment() {
+# Latency focused experiments
+run_experiment_time() {
     local num_images=$1
-
-    # Define temporary file paths for sender and receiver outputs and pipe
-    local sender_output="sender_output.txt"
-    local receiver_output="receiver_output.txt"
-    local pipe="pipe"
     local test_type=$2
 
-    # Define temporary pipe for IPC
-    if [ "$test_type" == "pipes" ]; then
-        mkfifo $pipe
-    fi
-
     # Run sender executable in background and capture output to file
-    ./builddir/sender $test_type $num_images > "$sender_output" &
+    ./builddir/sender $test_type "1" $num_images > "$sender_output" &
     local sender_pid=$!
 
     # Sleep if we are dealing with shared memory
@@ -25,9 +19,9 @@ run_experiment() {
     fi
 
     # Run receiver executable in background and capture output to file
-    ./builddir/receiver $test_type > "$receiver_output" &
+    ./builddir/receiver $test_type "1" > "$receiver_output" &
     local receiver_pid=$!
-
+    #perf record -p "$receiver_pid" -g -o "$output_file"
     # Wait for both processes to finish
     wait "$sender_pid"
     wait "$receiver_pid"
@@ -44,19 +38,44 @@ run_experiment() {
     else
         echo "scale=3; ($receive_time - $send_time) / 1000000" | bc
     fi
-
-    # Clean up temporary files and pipe
-    rm "$sender_output" "$receiver_output" 
-
-    if [ "$test_type" == "pipes" ]; then
-        rm "$pipe"
-    fi
 }
 
-# Array of image counts to test
-image_counts=(1 5 10 20 40 80 160)
+# Performance focused experiments
+run_experiment_perf() {
+    local num_images=$1
+    local test_type=$2
+
+    # Run sender executable in background and capture output to file
+    # Capture perf stat output to a temporary file
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/sender $test_type "0" $num_images > perf_sender_output.txt 2>&1 &
+    local sender_pid=$!
+
+    # Sleep if we are dealing with shared memory
+    if [ "$test_type" == "shared" ]; then
+    sleep 0.5
+    fi
+
+    # Run receiver executable in background and capture output to file
+    # Capture perf stat output to a temporary file
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/receiver $test_type "0" > perf_receiver_output.txt 2>&1 &
+    local receiver_pid=$!
+
+    # Wait for both processes to finish
+    wait "$sender_pid"
+    wait "$receiver_pid"
+    grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions|mem-load|mem-store' perf_sender_output.txt | sed 's/^\s*//;s/\s\+/,/g' >> perf_sender_stats.csv
+    grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions|mem-load|mem-store' perf_receiver_output.txt | sed 's/^\s*//;s/\s\+/,/g' >> perf_receiver_stats.csv
+}
+
+# Define temporary pipe for IPC
+mkfifo $pipe
+
+# Experiment parameters
+image_counts=(1 5 10 20 40 80 160) # Array of image counts to test
 types=("pipes" "shared" "queue")
 reps=1
+
+# # Run latency focused experiments
 for type in "${types[@]}"; do
     echo "Running experiments for $type"
     # Loop over each number of images
@@ -64,12 +83,27 @@ for type in "${types[@]}"; do
         total_time=0
         # Run the experiment 50 times for the current number of images
         for ((i=1; i<=$reps; i++)); do
-            result=$(run_experiment $num_images $type)
+            result=$(run_experiment_time $num_images $type)
             total_time=$(echo "$total_time + $result" | bc)
         done
         # Calculate the average time
         average_time=$(echo "scale=3; $total_time / $reps" | bc)
         throughput=$(echo "scale=4; ($num_images / $average_time) * 1000" | bc)
-        echo "IPC_type: $type, size: $num_images MB, E2E_latency: $average_time ms, throughput: $throughput MB/sec"
+        echo "IPC_type: $type, size: $num_images MB, E2E_latency: $average_time ms, throughput: $throughput MB/sec" >> "time_experiment.txt"
     done
 done
+
+# Run performance focused experiments
+for type in "${types[@]}"; do
+    echo "Running experiments for $type"
+    # Loop over each number of images
+    for num_images in "${image_counts[@]}"; do
+        # Run the experiment 50 times for the current number of images
+        for ((i=1; i<=$reps; i++)); do
+            run_experiment_perf $num_images $type
+        done
+    done
+done
+
+# Clean up temporary files and pipe
+rm "$sender_output" "$receiver_output" "$pipe"
