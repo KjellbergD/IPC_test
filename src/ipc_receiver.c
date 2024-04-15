@@ -16,6 +16,7 @@
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
 #define MSGQ_KEY 80
+#define SHM_MSGQ_KEY 91
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 
 static int do_print = 0;
@@ -28,7 +29,6 @@ void save_image(unsigned char *image_data);
 
 int main(int argc, char *argv[])
 {
-    sleep(1);
     if (argc != 3)
     {
         printf("Usage: %s <function_name> <do_print>\n", argv[0]);
@@ -59,22 +59,35 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// Shared memory MSG queue struct
+typedef struct SHM_info
+{
+    long mtype;
+    int shm_key;
+} SHM_info;
+
 // Experiment for Shared Memory
 void shared_memory()
 {
-    struct timespec before_attach_time, after_attach_time;
-
-    // Recieve shared memory id from recieved data
-    int shmid;
-
-    // Start timer before attaching to shared memory segment
-    if (clock_gettime(CLOCK_MONOTONIC, &before_attach_time) < 0)
+    // Access the message queue
+    int msqid;
+    if ((msqid = msgget(SHM_MSGQ_KEY, IPC_CREAT | 0666)) < 0)
     {
-        perror("clock_gettime");
+        perror("msgget receiver");
         exit(EXIT_FAILURE);
     }
 
-    if ((shmid = shmget(SHM_KEY, 0, 0)) == -1)
+    // Receive message from the queue
+    SHM_info shm_info;
+    if (msgrcv(msqid, &shm_info, sizeof(shm_info), 1, 0) < 0)
+    {
+        perror("msgrcv receiver 1");
+        exit(EXIT_FAILURE);
+    }
+
+    // Recieve shared memory id from recieved data
+    int shmid;
+    if ((shmid = shmget(shm_info.shm_key, 0, 0)) == -1)
     {
         perror("Shared memory get");
         return;
@@ -90,17 +103,14 @@ void shared_memory()
     }
 
     // End timer after attaching to shared memory
-    if (clock_gettime(CLOCK_MONOTONIC, &after_attach_time) < 0)
+    struct timespec receive_time;
+    if (clock_gettime(CLOCK_MONOTONIC, &receive_time) < 0)
     {
         perror("clock_gettime");
         exit(EXIT_FAILURE);
     }
 
-    // Calculate time it took to attach to shared memory segment
-    long elapsed_time_ns = ((after_attach_time.tv_sec - before_attach_time.tv_sec) \
-            * BILLION) + (after_attach_time.tv_nsec - before_attach_time.tv_nsec);
-
-    if (do_print) printf("%ld", elapsed_time_ns);
+    if (do_print) printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
     save_image(shmaddr);
 

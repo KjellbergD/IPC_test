@@ -14,6 +14,7 @@
 #define MSGQ_CHUNK_SIZE (1024 * 8)
 #define SHM_KEY 200
 #define MSGQ_KEY 80
+#define SHM_MSGQ_KEY 91
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
 #define TEST_IMG "img/JEPPE.PNG"
 #define ONE_MB (1024 * 1024)
@@ -27,7 +28,6 @@ void msg_queue(unsigned char *image_data, int image_size);
 
 int main(int argc, char *argv[])
 {
-    sleep(1);
     if (argc != 4)
     {
         printf("Usage: %s <function_name> <do_print> <num_images>\n", argv[0]);
@@ -87,16 +87,26 @@ int main(int argc, char *argv[])
 }
 
 // Experiment for Shared Memory
+
+// Shared memory MSG queue struct
+typedef struct SHM_info
+{
+    long mtype;
+    int shm_key;
+} SHM_info;
+
 void shared_memory(unsigned char *image_data, int image_size)
 {
-    struct timespec start_time, end_time;
     
     // Get the start time
-    if (clock_gettime(CLOCK_MONOTONIC, &start_time) < 0)
+    struct timespec send_time;
+    if (clock_gettime(CLOCK_MONOTONIC, &send_time) < 0)
     {
         perror("clock_gettime");
         exit(EXIT_FAILURE);
     }
+    
+    if (do_print) printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
     
     int shmid = shmget(SHM_KEY, image_size, IPC_CREAT | 0666);
     char *shmaddr = shmat(shmid, NULL, 0);
@@ -104,18 +114,22 @@ void shared_memory(unsigned char *image_data, int image_size)
     // Copy image data to shared memory segment
     memcpy(shmaddr, image_data, image_size);
 
-    // Get the end time
-    if (clock_gettime(CLOCK_MONOTONIC, &end_time) < 0)
+    SHM_info shm_info;
+    shm_info.mtype = 1;
+    shm_info.shm_key = SHM_KEY;
+
+    // create msg queue
+    int msg_queue_id;
+    if ((msg_queue_id = msgget(SHM_MSGQ_KEY, 0666 | IPC_CREAT)) == -1)
     {
-        perror("clock_gettime");
-        exit(EXIT_FAILURE);
+        perror("msgget error");
     }
 
-    // Calculate time it took to create, attach and copy to shared memory
-    long elapsed_time_ns = (end_time.tv_sec - start_time.tv_sec) \
-            * BILLION + (end_time.tv_nsec - start_time.tv_nsec);
-
-    if (do_print) printf("%ld", elapsed_time_ns);
+    // send msg to queue
+    if (msgsnd(msg_queue_id, &shm_info, sizeof(shm_info), 0) == -1)
+    {
+        perror("msgsnd error");
+    }
 
     // Detach from shared memory
     shmdt(shmaddr);
