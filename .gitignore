@@ -4,6 +4,12 @@
 # .vscode
 .vscode/
 
+# images
+img/
+
+# text results
+*.txt
+
 # Object files
 *.o
 *.ko
