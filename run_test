@@ -61,7 +61,7 @@ run_experiment_perf() {
         result+=$(printf "%'d" "$sum")" "
     done
 
-    echo "${result% }" >> perf_experiments.txt  # Remove trailing space and print
+    echo "${result% }" >> perf_experiment.txt  # Remove trailing space and print
 }
 
 run_experiment_top() {
@@ -165,7 +165,7 @@ for type in "${types[@]}"; do
 done
 
 # Run performance focused experiments
-echo "type size rep cache-misses cache-references context-switches cpu-cycles instructions" > "perf_experiments.txt"
+echo "type size rep cache-misses cache-references context-switches cpu-cycles instructions" > "perf_experiment.txt"
 for type in "${types[@]}"; do
     echo "Running perf experiments for $type"
     # Loop over each number of images
