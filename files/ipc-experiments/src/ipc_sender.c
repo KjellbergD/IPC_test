@@ -14,7 +14,6 @@
 #define MSGQ_KEY 80
 #define SHM_MSGQ_KEY 91
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
-#define TEST_IMG "img/JEPPE.PNG"
 #define ONE_MB (1024 * 1024)
 
 static int do_print = 0;

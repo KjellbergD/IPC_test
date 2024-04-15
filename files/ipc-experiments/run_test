@@ -10,11 +10,11 @@ run_experiment_time() {
     local test_type=$2
 
     # Run sender executable in background and capture output to file
-    ./builddir/ipc_sender $test_type "1" $num_images > "$sender_output" &
+    ipc_sender $test_type "1" $num_images > "$sender_output" &
     local sender_pid=$!
 
     # Run receiver executable in background and capture output to file
-    ./builddir/ipc_receiver $test_type "1" > "$receiver_output" &
+    ipc_receiver $test_type "1" > "$receiver_output" &
     local receiver_pid=$!
 
     # Wait for both processes to finish
@@ -38,12 +38,12 @@ run_experiment_perf() {
 
     # Run sender executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_sender $test_type "0" $num_images > "$sender_output" 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ipc_sender $test_type "0" $num_images > "$sender_output" 2>&1 &
     local sender_pid=$!
 
     # Run receiver executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_receiver $test_type "0" > "$receiver_output" 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ipc_receiver $test_type "0" > "$receiver_output" 2>&1 &
     local receiver_pid=$!
 
     # Wait for both processes to finish
@@ -75,11 +75,11 @@ run_experiment_top() {
     sleep 0.2
 
     # Run sender executable in background and capture output to file
-    ./builddir/ipc_sender $test_type "0" $num_images &
+    ipc_sender $test_type "0" $num_images &
     local sender_pid=$!
 
     # Run receiver executable in background and capture output to file
-    ./builddir/ipc_receiver $test_type "0" &
+    ipc_receiver $test_type "0" &
     local receiver_pid=$!
 
     # Wait for both processes to finish
