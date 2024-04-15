@@ -139,7 +139,7 @@ mkfifo $pipe
 # Experiment parameters
 image_counts=(1 4 16 64 256 1024) # Array of image counts to test
 types=("pipes" "shared" "queue")
-reps=1
+reps=${1:-50} # Default to 50 unless provided as argument
 
 Run latency focused experiments
 echo "type size latency(ms) throughput(MB/sec)" > "time_experiment.txt"
