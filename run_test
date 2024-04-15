@@ -10,16 +10,11 @@ run_experiment_time() {
     local test_type=$2
 
     # Run sender executable in background and capture output to file
-    ./builddir/sender $test_type "1" $num_images > "$sender_output" &
+    ./builddir/ipc_sender $test_type "1" $num_images > "$sender_output" &
     local sender_pid=$!
 
-    # Sleep if we are dealing with shared memory
-    if [ "$test_type" == "shared" ]; then
-    sleep 0.5
-    fi
-
     # Run receiver executable in background and capture output to file
-    ./builddir/receiver $test_type "1" > "$receiver_output" &
+    ./builddir/ipc_receiver $test_type "1" > "$receiver_output" &
     local receiver_pid=$!
     #perf record -p "$receiver_pid" -g -o "$output_file"
     # Wait for both processes to finish
@@ -32,12 +27,7 @@ run_experiment_time() {
 
     # Calculate time difference (diff) in milliseconds with higher precision
     # Convert nanoseconds to milliseconds using floating-point arithmetic
-    if [ "$test_type" == "shared" ]; then
-        # if shared, add the times
-        echo "scale=3; ($receive_time + $send_time) / 1000000" | bc
-    else
-        echo "scale=3; ($receive_time - $send_time) / 1000000" | bc
-    fi
+    echo "scale=3; ($receive_time - $send_time) / 1000000" | bc
 }
 
 # Performance focused experiments
@@ -48,17 +38,12 @@ run_experiment_perf() {
 
     # Run sender executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/sender $test_type "0" $num_images > perf_sender_output.txt 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_sender $test_type "0" $num_images > perf_sender_output.txt 2>&1 &
     local sender_pid=$!
-
-    # Sleep if we are dealing with shared memory
-    if [ "$test_type" == "shared" ]; then
-    sleep 0.5
-    fi
 
     # Run receiver executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/receiver $test_type "0" > perf_receiver_output.txt 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_receiver $test_type "0" > perf_receiver_output.txt 2>&1 &
     local receiver_pid=$!
 
     # Wait for both processes to finish
@@ -79,47 +64,74 @@ run_experiment_perf() {
     echo "${result% }" >> perf_experiments.txt  # Remove trailing space and print
 }
 
-run_experiment_memory() {
+run_experiment_top() {
     local num_images=$1
     local test_type=$2
     local test_num=$3
 
-    # Temporary files for capturing time output
-    local sender_time_output=$(mktemp)
-    local receiver_time_output=$(mktemp)
+    local output_temp="top_output.txt"
 
-    # Run sender binary with time command and capture peak memory usage and CPU usage
-    /usr/bin/time -f "Peak Memory:%M\nUser CPU time:%U\nSystem CPU time:%S\nTotal time:%e" ./builddir/sender $test_type "1" $num_images > "$sender_time_output" 2>&1 &
+    top -b -d 0.1  > $output_temp &
+    top_pid=$!
+
+    sleep 0.2
+
+    # Run sender executable in background and capture output to file
+    ./builddir/ipc_sender $test_type "0" $num_images &
     local sender_pid=$!
 
-    # Sleep if we are dealing with shared memory
-    if [ "$test_type" == "shared" ]; then
-    sleep 0.5
-    fi
-
-    # Run receiver executable in background with time command and capture peak memory usage and CPU usage
-    /usr/bin/time -f "Peak Memory:%M\nUser CPU time:%U\nSystem CPU time:%S\nTotal time:%e" ./builddir/receiver $test_type "1" > "$receiver_time_output" 2>&1 &
+    # Run receiver executable in background and capture output to file
+    ./builddir/ipc_receiver $test_type "0" &
     local receiver_pid=$!
 
     # Wait for both processes to finish
     wait "$sender_pid"
     wait "$receiver_pid"
+    
+    sleep 0.2
 
-    local sender_peak_memory=$(grep 'Peak Memory' "$sender_time_output" | cut -d':' -f2)
-    local sender_user_cpu_time=$(grep 'User CPU time' "$sender_time_output" | cut -d':' -f2)
-    local sender_system_cpu_time=$(grep 'System CPU time' "$sender_time_output" | cut -d':' -f2)
-    local sender_total_time=$(grep 'Total time' "$sender_time_output" | cut -d':' -f2)
+    kill $top_pid >/dev/null 2>&1
+    wait $top_pid >/dev/null 2>&1
 
-    local receiver_peak_memory=$(grep 'Peak Memory' "$receiver_time_output" | cut -d':' -f2)
-    local receiver_user_cpu_time=$(grep 'User CPU time' "$receiver_time_output" | cut -d':' -f2)
-    local receiver_system_cpu_time=$(grep 'System CPU time' "$receiver_time_output" | cut -d':' -f2)
-    local receiver_total_time=$(grep 'Total time' "$receiver_time_output" | cut -d':' -f2)
-
-    # Clean up the temporary files
-    rm "$sender_time_output" "$receiver_time_output"
-    # Optionally, echo the captured values for debugging or logging, now in one line each
-    echo "Sender - Peak Memory: $sender_peak_memory KB, User CPU Time: $sender_user_cpu_time seconds, System CPU Time: $sender_system_cpu_time seconds, Total Time: $sender_total_time seconds"
-    echo "Receiver - Peak Memory: $receiver_peak_memory KB, User CPU Time: $receiver_user_cpu_time seconds, System CPU Time: $receiver_system_cpu_time seconds, Total Time: $receiver_total_time seconds"
+    # Extract memory usage from top output
+    # Process the input file line by line
+    cpu_snd="0.0"
+    cpu_rcv="0.0"
+    mem_snd="0.0"
+    mem_rcv="0.0"
+    mem_used="0.0"
+    snd_read=false
+    rcv_read=false
+    i=0
+    while IFS= read -r line; do
+        if [[ $line =~ ^top ]]; then
+            if [[ $i > 0 ]]; then
+                echo "$test_type $num_images $test_num $i $cpu_snd $mem_snd $cpu_rcv $mem_rcv $mem_used" >> "top_experiment.txt"
+                # Reset values in case the processes are not present
+                cpu_snd="0.0"
+                cpu_rcv="0.0"
+                mem_snd="0.0"
+                mem_rcv="0.0"
+                snd_read=false
+                rcv_read=false
+            fi
+            ((i++))
+        fi
+        if [[ $line =~ ipc_sender ]] && ! $snd_read; then
+            cpu_snd=$(echo "$line" | awk '{print $9}')
+            mem_snd=$(echo "$line" | awk '{print $10}')
+            snd_read=true
+        fi
+        if [[ $line =~ ipc_receiver ]] && ! $rcv_read; then
+            cpu_rcv=$(echo "$line" | awk '{print $9}')
+            mem_rcv=$(echo "$line" | awk '{print $10}')
+            rcv_read=true
+        fi
+        if [[ $line =~ "MiB Mem" ]]; then
+            mem_used=$(echo "$line" | awk '{print $8}')
+        fi
+    done < $output_temp
+    echo "$test_type $num_images $test_num $i $cpu_snd $mem_snd $cpu_rcv $mem_rcv $mem_used" >> "top_experiment.txt"
 }
 
 # Define temporary pipe for IPC
@@ -127,12 +139,12 @@ rm $pipe
 mkfifo $pipe
 
 # Experiment parameters
-image_counts=(1 5 10 20 40 80 160) # Array of image counts to test
+image_counts=(1 4 16 64 256 1024) # Array of image counts to test
 types=("pipes" "shared" "queue")
-reps=10
+reps=3
 
+Run latency focused experiments
 echo "type size latency(ms) throughput(MB/sec)" > "time_experiment.txt"
-# Run latency focused experiments
 for type in "${types[@]}"; do
     echo "Running latency and throughput experiments for $type"
     # Loop over each number of images
@@ -166,19 +178,21 @@ for type in "${types[@]}"; do
     done
 done
 
-# Run massif focused experiments
-# for type in "${types[@]}"; do
-#     echo "Running memory experiments for $type"
-#     # Loop over each number of images
-#     for num_images in "${image_counts[@]}"; do
-#         # Run the experiment 50 times for the current number of images
-#         echo "Message size $num_images"
-#         for i in $(seq 1 $reps); do 
-#             echo "Repetition $i"
-#             run_experiment_memory $num_images $type $i
-#         done
-#     done
-# done
+# Run top focused experiments
+echo "type size rep snapshot %CPU_snd %MEM_snd %CPU_rcv %MEM_rcv mem_used" > "top_experiment.txt"
+for type in "${types[@]}"; do
+    echo "Running top experiments for $type"
+    # Loop over each number of images
+    for num_images in "${image_counts[@]}"; do
+        # Run the experiment 50 times for the current number of images
+        echo "  Using image size: $num_images MB"
+        for i in $(seq 1 $reps); do 
+            run_experiment_top $num_images $type $i
+        done
+    done
+done
 
 # Clean up temporary files and pipe
 rm "$sender_output" "$receiver_output" "$pipe"
+
+echo "Done"
