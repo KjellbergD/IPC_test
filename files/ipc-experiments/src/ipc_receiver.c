@@ -8,8 +8,6 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 #define PIPE_PATH "pipe"
 #define PIPE_CHUNK_SIZE (1024 * 4)
@@ -25,7 +23,6 @@ static int do_print = 0;
 void shared_memory();
 void pipes();
 void msg_queue();
-void save_image(unsigned char *image_data);
 
 int main(int argc, char *argv[])
 {
@@ -112,8 +109,6 @@ void shared_memory()
 
     if (do_print) printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
-    save_image(shmaddr);
-
     // Cleanup: Detach from and delete the shared memory segment
     shmdt(shmaddr);
     shmctl(shmid, IPC_RMID, NULL);
@@ -158,11 +153,7 @@ void pipes()
 
     if (do_print) printf("%ld", BILLION * receive_time.tv_sec + receive_time.tv_nsec);
 
-    save_image(buffer);
     free(buffer);
-    // printf("Recieve time was: %llu \n", receive_time.tv_nsec);
-
-    // printf("Receiver received message: %s\n", buffer);
 
     // Close the FIFO
     close(fd);
@@ -242,21 +233,6 @@ void msg_queue()
         perror("msgctl");
         exit(EXIT_FAILURE);
     }
-    save_image(image_data);
     free(image_data);
 }
 
-void save_image(unsigned char *image_data)
-{
-    return;
-    int image_width = *(int *)image_data;
-    int image_height = *((int *)(image_data + sizeof(int)));
-    int image_channels = *((int *)(image_data + sizeof(int) * 2));
-
-    int stride = image_width * image_channels * sizeof(uint8_t);
-    int success = stbi_write_png("output.png", image_width, image_height, image_channels, image_data + sizeof(int) * 3, stride);
-    if (!success)
-    {
-        fprintf(stderr, "Error writing image\n");
-    }
-}

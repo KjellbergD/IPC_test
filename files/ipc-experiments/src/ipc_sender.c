@@ -6,8 +6,6 @@
 #include <time.h>
 #include <sys/shm.h>
 #include <sys/msg.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 #define PIPE_PATH "pipe"
 #define PIPE_CHUNK_SIZE (1024 * 4)
@@ -37,16 +35,11 @@ int main(int argc, char *argv[])
     do_print = atoi(argv[2]);
     int num_images = atoi(argv[3]);
 
-    // Load test image
-    //int image_width, image_height, image_channels;
-    //unsigned char *raw_image_data = stbi_load(TEST_IMG, &image_width, &image_height, &image_channels, STBI_rgb_alpha);
     unsigned char one_mb_image_data[ONE_MB];
     unsigned char data_pattern = 0xAB;
     for (int i = 0; i < ONE_MB; i++) {
         one_mb_image_data[i] = data_pattern;
     }
-    //memcpy(one_mb_image_data, raw_image_data, ONE_MB); // copy one MB of image data
-    //stbi_image_free(raw_image_data);
 
     int fake_width = 1024;
     int fake_height = 1024;

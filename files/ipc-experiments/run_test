@@ -1,7 +1,7 @@
 #!/bin/bash
 sender_output="sender_output.txt"
 receiver_output="receiver_output.txt"
-output_file="perf_data.perf"  # Output file name
+top_output="top_output.txt"
 pipe="pipe"
 
 # Latency focused experiments
@@ -16,7 +16,7 @@ run_experiment_time() {
     # Run receiver executable in background and capture output to file
     ./builddir/ipc_receiver $test_type "1" > "$receiver_output" &
     local receiver_pid=$!
-    #perf record -p "$receiver_pid" -g -o "$output_file"
+
     # Wait for both processes to finish
     wait "$sender_pid"
     wait "$receiver_pid"
@@ -38,20 +38,20 @@ run_experiment_perf() {
 
     # Run sender executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_sender $test_type "0" $num_images > perf_sender_output.txt 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_sender $test_type "0" $num_images > "$sender_output" 2>&1 &
     local sender_pid=$!
 
     # Run receiver executable in background and capture output to file
     # Capture perf stat output to a temporary file
-    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_receiver $test_type "0" > perf_receiver_output.txt 2>&1 &
+    perf stat -e cache-misses,cache-references,context-switches,cpu-cycles,instructions ./builddir/ipc_receiver $test_type "0" > "$receiver_output" 2>&1 &
     local receiver_pid=$!
 
     # Wait for both processes to finish
     wait "$sender_pid"
     wait "$receiver_pid"
     # Extract and sum up each metric separately for sender and receiver
-    local sender_values=($(grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions' perf_sender_output.txt | awk '{gsub(",", ""); print $1}'))
-    local receiver_values=($(grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions' perf_receiver_output.txt | awk '{gsub(",", ""); print $1}'))
+    local sender_values=($(grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions' "$sender_output" | awk '{gsub(",", ""); print $1}'))
+    local receiver_values=($(grep -E 'cache-misses|cache-references|context-switches|cpu-cycles|instructions' "$receiver_output" | awk '{gsub(",", ""); print $1}'))
 
     local num_metrics=5
     local result="$test_type $num_images $test_num "
@@ -69,9 +69,7 @@ run_experiment_top() {
     local test_type=$2
     local test_num=$3
 
-    local output_temp="top_output.txt"
-
-    top -b -d 0.1  > $output_temp &
+    top -b -d 0.1  > "$top_output" &
     top_pid=$!
 
     sleep 0.2
@@ -130,7 +128,7 @@ run_experiment_top() {
         if [[ $line =~ "MiB Mem" ]]; then
             mem_used=$(echo "$line" | awk '{print $8}')
         fi
-    done < $output_temp
+    done < $top_output
     echo "$test_type $num_images $test_num $i $cpu_snd $mem_snd $cpu_rcv $mem_rcv $mem_used" >> "top_experiment.txt"
 }
 
@@ -141,7 +139,7 @@ mkfifo $pipe
 # Experiment parameters
 image_counts=(1 4 16 64 256 1024) # Array of image counts to test
 types=("pipes" "shared" "queue")
-reps=3
+reps=1
 
 Run latency focused experiments
 echo "type size latency(ms) throughput(MB/sec)" > "time_experiment.txt"
@@ -193,6 +191,6 @@ for type in "${types[@]}"; do
 done
 
 # Clean up temporary files and pipe
-rm "$sender_output" "$receiver_output" "$pipe"
+rm "$sender_output" "$receiver_output" "$top_output" "$pipe"
 
 echo "Done"
