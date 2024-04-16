@@ -1,13 +1,13 @@
 SUMMARY = "DISCO II Image processing pipeline Experiments"
 SECTION = "DIPP-EXPERIMENTS"
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=89e0ce65cb73fcf143363bd750fea72b"
+LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "file://ipc-experiments/"
 
 S = "${WORKDIR}/ipc-experiments"
 
-DEPENDS = "curl openssl meson-native ninja-native pkgconfig linux-tools-common linux-tools-generic procps build-essential"
+DEPENDS = "curl openssl meson-native ninja-native pkgconfig procps perf bc"
 
 inherit meson pkgconfig
 
@@ -44,8 +44,8 @@ do_configure() {
 do_install() {
     ninja -C ${B} install
     install -d ${D}/usr/share/dipp-experiments
-    install -m 0644 ${WORKDIR}/ipc_experiments/run_test ${D}/usr/share/dipp-experiments
+    install -m 0644 ${WORKDIR}/ipc-experiments/run_test ${D}/usr/share/dipp-experiments
 }
 
 FILES:${PN} += "${libdir}/*"
-FILES_${PN} += "/usr/share/dipp-experiments"
+FILES:${PN} += "/usr/share/dipp-experiments"
