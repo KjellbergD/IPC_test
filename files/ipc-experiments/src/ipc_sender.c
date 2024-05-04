@@ -10,7 +10,6 @@
 #define PIPE_PATH "pipe"
 #define PIPE_CHUNK_SIZE (1024 * 4)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
-#define SHM_KEY 200
 #define MSGQ_KEY 80
 #define SHM_MSGQ_KEY 91
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
@@ -84,7 +83,7 @@ int main(int argc, char *argv[])
 typedef struct SHM_info
 {
     long mtype;
-    int shm_key;
+    int shm_id;
 } SHM_info;
 
 void shared_memory(unsigned char *image_data, int image_size)
@@ -100,7 +99,7 @@ void shared_memory(unsigned char *image_data, int image_size)
     
     if (do_print) printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
     
-    int shmid = shmget(SHM_KEY, image_size, IPC_CREAT | 0666);
+    int shmid = shmget(send_time.tv_nsec, image_size, IPC_CREAT | 0666);
     char *shmaddr = shmat(shmid, NULL, 0);
 
     // Copy image data to shared memory segment
@@ -108,7 +107,7 @@ void shared_memory(unsigned char *image_data, int image_size)
 
     SHM_info shm_info;
     shm_info.mtype = 1;
-    shm_info.shm_key = SHM_KEY;
+    shm_info.shm_id = shmid;
 
     // create msg queue
     int msg_queue_id;

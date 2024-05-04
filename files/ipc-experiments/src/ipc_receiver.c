@@ -12,7 +12,6 @@
 #define PIPE_PATH "pipe"
 #define PIPE_CHUNK_SIZE (1024 * 4)
 #define MSGQ_CHUNK_SIZE (1024 * 8)
-#define SHM_KEY 200
 #define MSGQ_KEY 80
 #define SHM_MSGQ_KEY 91
 #define BILLION 1000000000L // 1 billion nanoseconds in a second
@@ -60,7 +59,7 @@ int main(int argc, char *argv[])
 typedef struct SHM_info
 {
     long mtype;
-    int shm_key;
+    int shm_id;
 } SHM_info;
 
 // Experiment for Shared Memory
@@ -82,23 +81,15 @@ void shared_memory()
         exit(EXIT_FAILURE);
     }
 
-    // Recieve shared memory id from recieved data
-    int shmid;
-    if ((shmid = shmget(shm_info.shm_key, 0, 0)) == -1)
-    {
-        perror("Shared memory get");
-        return;
-    }
-
     // Attach to shared memory from id
-    void *shmaddr = shmat(shmid, NULL, 0);
+    void *shmaddr = shmat(shm_info.shm_id, NULL, 0);
 
     if (shmaddr == (void *)-1)
     {
         perror("Shared memory attach");
         return;
     }
-
+    
     // End timer after attaching to shared memory
     struct timespec receive_time;
     if (clock_gettime(CLOCK_MONOTONIC, &receive_time) < 0)
@@ -111,7 +102,7 @@ void shared_memory()
 
     // Cleanup: Detach from and delete the shared memory segment
     shmdt(shmaddr);
-    shmctl(shmid, IPC_RMID, NULL);
+    shmctl(shm_info.shm_id, IPC_RMID, NULL);
 }
 
 // Experiment for Pipe communication
