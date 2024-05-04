@@ -137,7 +137,7 @@ rm $pipe
 mkfifo $pipe
 
 # Experiment parameters
-image_counts=(1 4 16 64 256 1024) # Array of image counts to test
+image_counts=(1 4 16 64 256 512) # Array of image counts to test
 types=("pipes" "shared" "queue")
 reps=${1:-50} # Default to 50 unless provided as argument
 
