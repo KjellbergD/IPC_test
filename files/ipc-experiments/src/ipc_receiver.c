@@ -89,6 +89,8 @@ void shared_memory()
         perror("Shared memory attach");
         return;
     }
+
+    // printf("Receiver: %02X\n", ((unsigned char *)shmaddr)[777777]);
     
     // End timer after attaching to shared memory
     struct timespec receive_time;
