@@ -23,6 +23,14 @@ void shared_memory(unsigned char *image_data, int image_size);
 void pipes(unsigned char *image_data, int image_size);
 void msg_queue(unsigned char *image_data, int image_size);
 
+
+void fill_random_data(unsigned char* buffer, size_t size) {
+    srand(time(NULL)); // Seed the random number generator
+    for (size_t i = 0; i < size; i++) {
+        buffer[i] = rand() % 256;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 4)
@@ -34,25 +42,28 @@ int main(int argc, char *argv[])
     do_print = atoi(argv[2]);
     int num_images = atoi(argv[3]);
 
-    unsigned char one_mb_image_data[ONE_MB];
-    unsigned char data_pattern = 0xAB;
-    for (int i = 0; i < ONE_MB; i++) {
-        one_mb_image_data[i] = data_pattern;
-    }
+    // unsigned char one_mb_image_data[ONE_MB];
 
-    int fake_width = 1024;
-    int fake_height = 1024;
-    int fake_channels = 1;
-    int image_data_size = (ONE_MB + 3 * sizeof(int)) * num_images;
-    int offset = 0;
+
+    // unsigned char data_pattern = 0xAB;
+    // for (int i = 0; i < ONE_MB; i++) {
+    //     one_mb_image_data[i] = data_pattern;
+    // }
+
+    // int fake_width = 1024;
+    // int fake_height = 1024;
+    // int fake_channels = 1;
+    int image_data_size = ONE_MB * num_images;
+    // int offset = 0;
     unsigned char *image_data = (unsigned char *)malloc(image_data_size);
-    for (size_t i = 0; i < num_images; i++)
-    {
-        memcpy(image_data + offset, &fake_width, sizeof(int)); offset += sizeof(int);
-        memcpy(image_data + offset, &fake_height, sizeof(int)); offset += sizeof(int);
-        memcpy(image_data + offset, &fake_channels, sizeof(int)); offset += sizeof(int);
-        memcpy(image_data + offset, one_mb_image_data, ONE_MB); offset += ONE_MB;
-    }
+    fill_random_data(image_data, image_data_size);
+    // for (size_t i = 0; i < num_images; i++)
+    // {
+    //     memcpy(image_data + offset, &fake_width, sizeof(int)); offset += sizeof(int);
+    //     memcpy(image_data + offset, &fake_height, sizeof(int)); offset += sizeof(int);
+    //     memcpy(image_data + offset, &fake_channels, sizeof(int)); offset += sizeof(int);
+    //     memcpy(image_data + offset, one_mb_image_data, ONE_MB); offset += ONE_MB;
+    // }
     
     // Check the string argument and call respective functions
     if (strcmp(argv[1], "shared") == 0)
@@ -101,10 +112,14 @@ void shared_memory(unsigned char *image_data, int image_size)
     if (do_print) printf("%ld", BILLION * send_time.tv_sec + send_time.tv_nsec);
     
     int shmid = shmget(send_time.tv_nsec, image_size, IPC_CREAT | 0666);
-    char *shmaddr = shmat(shmid, NULL, 0);
+    unsigned char *shmaddr = shmat(shmid, NULL, 0);
 
+    // printf("Sender before memcpy: %02X\n", shmaddr[777777]);
+    
     // Copy image data to shared memory segment
-    memcpy(shmaddr, image_data, image_size);
+    memcpy(shmaddr, image_data, image_size);    
+
+    // printf("Sender after memcpy: %02X\n", shmaddr[777777]);
 
     SHM_info shm_info;
     shm_info.mtype = 1;
